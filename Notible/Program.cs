@@ -1,10 +1,8 @@
-﻿using System;
-using System.IO;
-using Microsoft.Extensions.Configuration;
-
-using MongoDB.Driver;
+﻿using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
+
+using Microsoft.Extensions.Configuration;
 
 using Notible;
 
@@ -15,6 +13,13 @@ class Program
     private const byte SEARCH = 3;
     private const byte DELETE = 4;
     private const byte EXIT = 5;
+    
+    private const int SEARCH_PROPERTY_NAME = 1;
+    private const int SEARCH_PROPERTY_LOCATION = 2;
+    private const int SEARCH_PROPERTY_PRICE = 3;
+    private const int SEARCH_PROPERTY_IS_HEALTHY = 4;
+    private const int SEARCH_PROPERTY_IS_GOOD_PRICE = 5;
+    private const int SEARCH_PROPERTY_ID = 6;
     
     private static IMongoDatabase myDb;
     private static IMongoCollection<BsonDocument> collection;
@@ -45,9 +50,11 @@ class Program
                     break;
             
                 case SEARCH:
+                    SearchFoodEntry();
                     break;
             
                 case DELETE:
+                    DeleteEntry();
                     break;
                 
                 case EXIT:
@@ -60,13 +67,13 @@ class Program
     private static void AddOneFoodEntry()
     {
         Console.WriteLine("Enter food name: ");
-        string foodName = Console.ReadLine();
+        string foodName = Console.ReadLine().ToLower();
         
         Console.WriteLine("Enter food price: ");
         int price = Helper.GetValidIntInput(0, Int32.MaxValue);
         
         Console.WriteLine("Enter location where you can purchase this food: ");
-        string location = Console.ReadLine();
+        string location = Console.ReadLine().ToLower();
         
         Console.WriteLine("Is this food Healthy?(y/n): ");
         bool isHealthy = Helper.GetValidBoolInput();
@@ -84,6 +91,108 @@ class Program
         };
         
         collection.InsertOne(entry.ToBsonDocument());
+    }
+    
+    private static void SearchFoodEntry()
+    {
+        Console.WriteLine("Enter the property you would like to search:\nName (1)\nLocation (2)\nPrice (3)\nIs Healthy (4)\nIs Good Price (5)\nID (6)");
+        int choice = Helper.GetValidIntInput(1, 6);
+        List<BsonDocument> results = new List<BsonDocument>();
+        FilterDefinition<BsonDocument> filter = FilterDefinition<BsonDocument>.Empty;
+
+        switch (choice)
+        {
+            case SEARCH_PROPERTY_NAME:
+                Console.WriteLine("Enter the name of the food you would like to search:");
+                string foodName = Console.ReadLine().ToLower();
+            
+                filter = Builders<BsonDocument>.Filter.Eq(MealEntry.FOOD_NAME_STR, foodName);
+                results = collection.Find(filter).ToList();
+                break;
+            
+            case SEARCH_PROPERTY_LOCATION:
+                Console.WriteLine("Enter the location you would like to search:");
+                string foodLoc = Console.ReadLine().ToLower();
+            
+                filter = Builders<BsonDocument>.Filter.Eq(MealEntry.LOCATION_STR, foodLoc);
+                results = collection.Find(filter).ToList();
+                break;
+            
+            case SEARCH_PROPERTY_PRICE:
+                Console.WriteLine("Enter the lowest price of the foods you would like to search:");
+                int lowerBound = Helper.GetValidIntInput(0, Int32.MaxValue);
+                
+                Console.WriteLine("Enter the highest price of the foods you would like to search:");
+                int upperBound = Helper.GetValidIntInput(lowerBound, Int32.MaxValue);
+
+                filter = Builders<BsonDocument>.Filter.Gte(MealEntry.PRICE_STR, lowerBound);
+                filter &= Builders<BsonDocument>.Filter.Lte(MealEntry.PRICE_STR, upperBound);
+                results = collection.Find(filter).ToList();
+                break;
+            
+            case SEARCH_PROPERTY_IS_HEALTHY:
+                Console.WriteLine("Search for healthy food (y) or not healthy food (n)?(y/n): ");
+                bool enteredHealthy = Helper.GetValidBoolInput();
+            
+                filter = Builders<BsonDocument>.Filter.Eq(MealEntry.IS_HEALTHY_STR, enteredHealthy);
+                results = collection.Find(filter).ToList();
+                break;
+            
+            case SEARCH_PROPERTY_IS_GOOD_PRICE:
+                Console.WriteLine("Search for well priced food (y) or not well priced food (n)?(y/n): ");
+                bool enteredPrice = Helper.GetValidBoolInput();
+            
+                filter = Builders<BsonDocument>.Filter.Eq(MealEntry.IS_GOOD_PRICE_STR, enteredPrice);
+                results = collection.Find(filter).ToList();
+                break;
+            
+            case SEARCH_PROPERTY_ID:
+                Console.WriteLine("Enter the exact ID of the food entry you would like to search:");
+                string enteredFoodId = Helper.GetValidHexInput();
+                ObjectId documentId = new ObjectId(enteredFoodId);
+                
+                filter = Builders<BsonDocument>.Filter.Eq(MealEntry.ID_STR, documentId);
+                results = collection.Find(filter).ToList();
+                break;
+            
+            default:
+                throw new ArgumentOutOfRangeException("Invalid choice");
+        }
+
+        if (results.Count > 0)
+        {
+            MealEntry entry = null;
+            foreach (var r in results)
+            {
+                entry = BsonSerializer.Deserialize<MealEntry>(r);
+                Console.WriteLine("----------\n" + entry.FormattedString());
+            }
+        
+            Console.WriteLine("----------");
+        }
+        else
+        {
+            Console.WriteLine("No food entries found");
+        }
+    }
+    
+    private static void DeleteEntry()
+    {
+        Console.WriteLine("Enter the 24 character hexadecimal id of the food entry you would like to delete:");
+        string enteredFoodId = Helper.GetValidHexInput();
+        ObjectId documentId = new ObjectId(enteredFoodId);
+        
+        FilterDefinition<BsonDocument> filter = Builders<BsonDocument>.Filter.Eq(MealEntry.ID_STR, documentId);
+        DeleteResult res = collection.DeleteOne(filter);
+        
+        if (res.DeletedCount > 0)
+        {
+            Console.WriteLine("Entry deleted successfully.");
+        }
+        else
+        {
+            Console.WriteLine($"No food entries found with and ID of {enteredFoodId}.");
+        }
     }
     
     /// <summary>
@@ -118,7 +227,7 @@ class Program
         //Creates a class map for the MealEntry class so it can be treated as a BSON doucment
         BsonClassMap.RegisterClassMap<MealEntry>(classMap =>
         {
-            classMap.MapMember(e => e.Id);
+            classMap.MapIdMember(e => e.Id);
             classMap.MapMember(e => e.FoodName);
             classMap.MapMember(e => e.Price);
             classMap.MapMember(e => e.Location);

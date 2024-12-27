@@ -1,12 +1,20 @@
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace Notible;
 
-internal class MealEntry
+internal sealed class MealEntry
 {
+    public const string ID_STR = "_id";
+    public const string FOOD_NAME_STR = "FoodName";
+    public const string PRICE_STR = "Price";
+    public const string LOCATION_STR = "Location";
+    public const string IS_HEALTHY_STR = "IsHealthy";
+    public const string IS_GOOD_PRICE_STR = "IsGoodPrice";
+    
     [BsonId]
-    [BsonRepresentation(MongoDB.Bson.BsonType.ObjectId)]     
-    public string Id { get; set; }
+    [BsonRepresentation(BsonType.ObjectId)]     
+    public ObjectId Id { get; set; }
      
     [BsonElement("food_name")]
     public string FoodName { get; set; }
@@ -22,4 +30,9 @@ internal class MealEntry
     
     [BsonElement("is_good_price")]
     public bool IsGoodPrice { get; set; } 
+    
+    public string FormattedString()
+    {
+        return $"Entry ID: {Id.ToString()}\nFood Name {FoodName}\nPrice: ${Price}\nLocation: {Location}\nHealthy? {IsHealthy}\nGood Price? {IsGoodPrice}";
+    }
 }

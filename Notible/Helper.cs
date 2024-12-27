@@ -1,7 +1,11 @@
+using System.Text.RegularExpressions;
+
 namespace Notible;
 
 public class Helper
 {
+    private const int _ID_LENGTH = 24;
+    
     public static int GetValidIntInput()
     {
         bool validChoice;
@@ -63,5 +67,22 @@ public class Helper
         } while (!validChoice);
         
         return choice;
+    }
+
+    public static string GetValidHexInput()
+    {
+        string number;
+        bool validChoice = false;
+        
+        do
+        {
+            number = Console.ReadLine().PadLeft(_ID_LENGTH, '0');
+            if (Regex.IsMatch(number, @"^[a-fA-F0-9]*$")) validChoice = true;
+            
+            if(!validChoice) Console.WriteLine("Invalid ID. Please enter a valid hexadecimal ID.");
+            
+        } while (!validChoice);
+        
+        return number;
     }
 }
