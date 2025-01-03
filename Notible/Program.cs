@@ -47,6 +47,7 @@ class Program
                     break;
             
                 case UPDATE:
+                    UpdateFoodEntry();
                     break;
             
                 case SEARCH:
@@ -92,14 +93,78 @@ class Program
         
         collection.InsertOne(entry.ToBsonDocument());
     }
+
+    private static void UpdateFoodEntry()
+    {
+        Console.WriteLine("Enter the exact ID of the food entry you would like to update:");
+        string enteredFoodId = Helper.GetValidHexInput();
+        ObjectId documentId = new ObjectId(enteredFoodId);
+        
+        FilterDefinition<BsonDocument> filter = Builders<BsonDocument>.Filter.Eq(MealEntry.ID_STR, documentId);
+        UpdateDefinition<BsonDocument> update = null;
+        List<BsonDocument> results = collection.Find(filter).ToList();
+
+        if (results.Count == 0)
+        {
+            Console.WriteLine("No food entry found to update.");
+            return;
+        }
+        
+        Console.WriteLine("Enter the property you would like to edit:\nName (1)\nLocation (2)\nPrice (3)\nIs Healthy (4)\nIs Good Price (5)");
+        int choice = Helper.GetValidIntInput(1, 5);
+        
+         switch (choice)
+        {
+            case SEARCH_PROPERTY_NAME:
+                Console.WriteLine("Re-enter food name: ");
+                string foodName = Console.ReadLine().ToLower();
+                
+                update = Builders<BsonDocument>.Update.Set(MealEntry.FOOD_NAME_STR, foodName);
+                break;
+            
+            case SEARCH_PROPERTY_LOCATION:
+                Console.WriteLine("Re-enter food location: ");
+                string location = Console.ReadLine().ToLower();
+
+                update = Builders<BsonDocument>.Update.Set(MealEntry.LOCATION_STR, location);
+                break;
+            
+            case SEARCH_PROPERTY_PRICE:
+                Console.WriteLine("Re-enter food price: ");
+                int price = Helper.GetValidIntInput(0, Int32.MaxValue);
+                
+                update = Builders<BsonDocument>.Update.Set(MealEntry.PRICE_STR, price);
+                break;
+            
+            case SEARCH_PROPERTY_IS_HEALTHY:
+                Console.WriteLine("Is this food Healthy?(y/n): ");
+                bool isHealthy = Helper.GetValidBoolInput();
+                
+                update = Builders<BsonDocument>.Update.Set(MealEntry.IS_HEALTHY_STR, isHealthy);
+                break;
+            
+            case SEARCH_PROPERTY_IS_GOOD_PRICE:
+                Console.WriteLine("Is this food at a good price?(y/n): ");
+                bool isGoodPrice = Helper.GetValidBoolInput();
+                
+                update = Builders<BsonDocument>.Update.Set(MealEntry.IS_GOOD_PRICE_STR, isGoodPrice);
+                break;
+            
+            default:
+                throw new ArgumentOutOfRangeException("Invalid choice");
+        }
+        
+        collection.UpdateOne(filter, update);
+        Console.WriteLine("Successfully updated food entry");
+    }
     
     private static void SearchFoodEntry()
     {
         Console.WriteLine("Enter the property you would like to search:\nName (1)\nLocation (2)\nPrice (3)\nIs Healthy (4)\nIs Good Price (5)\nID (6)");
         int choice = Helper.GetValidIntInput(1, 6);
-        List<BsonDocument> results = new List<BsonDocument>();
         FilterDefinition<BsonDocument> filter = FilterDefinition<BsonDocument>.Empty;
-
+        List<BsonDocument> results = new List<BsonDocument>();
+        
         switch (choice)
         {
             case SEARCH_PROPERTY_NAME:
