@@ -1,4 +1,5 @@
-﻿using MongoDB.Driver;
+﻿using Amazon.Auth.AccessControlPolicy.ActionIdentifiers;
+using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 
@@ -11,8 +12,9 @@ class Program
     private const byte ADD_ONE = 1;
     private const byte UPDATE = 2;
     private const byte SEARCH = 3;
-    private const byte DELETE = 4;
-    private const byte EXIT = 5;
+    private const byte LIST = 4;
+    private const byte DELETE = 5;
+    private const byte EXIT = 6;
     
     private const int SEARCH_PROPERTY_NAME = 1;
     private const int SEARCH_PROPERTY_LOCATION = 2;
@@ -24,38 +26,41 @@ class Program
     private static IMongoDatabase myDb;
     private static IMongoCollection<BsonDocument> collection;
     
-    static void Main()
+    static async Task Main()
     {
-        InitMongoConnection();
+        await InitMongoConnectionAsync();
         bool exitProgram = false;
         
         int choice;
         bool validChoice;
         
-        
         while (!exitProgram)
         {
             Console.WriteLine("Notible");
-            Console.WriteLine("Enter and option:\n1) Add a new food entry\n2) Update a food entry\n3) Search existing food entries\n4) Delete a food entry\n5) Exit");
+            Console.WriteLine("Enter and option:\n1) Add a new food entry\n2) Update a food entry\n3) Search existing food entries\n4) List all existing food entries\n5) Delete a food entry\n6) Exit");
             
             choice = Helper.GetValidIntInput(ADD_ONE, EXIT);
         
             switch (choice)
             {
                 case ADD_ONE:
-                    AddOneFoodEntry();
+                    await AddOneFoodEntryAsync();
                     break;
             
                 case UPDATE:
-                    UpdateFoodEntry();
+                    await UpdateFoodEntryAsync();
                     break;
             
+                case LIST:
+                    await ListAllFoodEntriesAsync();
+                    break;
+                
                 case SEARCH:
-                    SearchFoodEntry();
+                    await SearchFoodEntryAsync();
                     break;
             
                 case DELETE:
-                    DeleteEntry();
+                    await DeleteEntryAsync();
                     break;
                 
                 case EXIT:
@@ -65,7 +70,7 @@ class Program
         }
     }
 
-    private static void AddOneFoodEntry()
+    private static async Task AddOneFoodEntryAsync()
     {
         Console.WriteLine("Enter food name: ");
         string foodName = Console.ReadLine().ToLower();
@@ -91,10 +96,12 @@ class Program
             IsGoodPrice = isGoodPrice
         };
         
-        collection.InsertOne(entry.ToBsonDocument());
+        Console.WriteLine("Adding food entry...");
+        await collection.InsertOneAsync(entry.ToBsonDocument());
+        Console.WriteLine("Successfully added food entry");
     }
 
-    private static void UpdateFoodEntry()
+    private static async Task UpdateFoodEntryAsync()
     {
         Console.WriteLine("Enter the exact ID of the food entry you would like to update:");
         string enteredFoodId = Helper.GetValidHexInput();
@@ -154,11 +161,12 @@ class Program
                 throw new ArgumentOutOfRangeException("Invalid choice");
         }
         
-        collection.UpdateOne(filter, update);
+        Console.WriteLine("Attempting to update the food entry...");
+        await collection.UpdateOneAsync(filter, update);
         Console.WriteLine("Successfully updated food entry");
     }
     
-    private static void SearchFoodEntry()
+    private static async Task SearchFoodEntryAsync()
     {
         Console.WriteLine("Enter the property you would like to search:\nName (1)\nLocation (2)\nPrice (3)\nIs Healthy (4)\nIs Good Price (5)\nID (6)");
         int choice = Helper.GetValidIntInput(1, 6);
@@ -172,7 +180,8 @@ class Program
                 string foodName = Console.ReadLine().ToLower();
             
                 filter = Builders<BsonDocument>.Filter.Eq(MealEntry.FOOD_NAME_STR, foodName);
-                results = collection.Find(filter).ToList();
+                Console.WriteLine("Searching for food entries...");
+                results = (await collection.FindAsync(filter)).ToList();
                 break;
             
             case SEARCH_PROPERTY_LOCATION:
@@ -180,7 +189,8 @@ class Program
                 string foodLoc = Console.ReadLine().ToLower();
             
                 filter = Builders<BsonDocument>.Filter.Eq(MealEntry.LOCATION_STR, foodLoc);
-                results = collection.Find(filter).ToList();
+                Console.WriteLine("Searching for food entries...");
+                results = (await collection.FindAsync(filter)).ToList();
                 break;
             
             case SEARCH_PROPERTY_PRICE:
@@ -192,7 +202,7 @@ class Program
 
                 filter = Builders<BsonDocument>.Filter.Gte(MealEntry.PRICE_STR, lowerBound);
                 filter &= Builders<BsonDocument>.Filter.Lte(MealEntry.PRICE_STR, upperBound);
-                results = collection.Find(filter).ToList();
+                results = (await collection.FindAsync(filter)).ToList();
                 break;
             
             case SEARCH_PROPERTY_IS_HEALTHY:
@@ -200,7 +210,8 @@ class Program
                 bool enteredHealthy = Helper.GetValidBoolInput();
             
                 filter = Builders<BsonDocument>.Filter.Eq(MealEntry.IS_HEALTHY_STR, enteredHealthy);
-                results = collection.Find(filter).ToList();
+                Console.WriteLine("Searching for food entries...");
+                results = (await collection.FindAsync(filter)).ToList();
                 break;
             
             case SEARCH_PROPERTY_IS_GOOD_PRICE:
@@ -208,7 +219,8 @@ class Program
                 bool enteredPrice = Helper.GetValidBoolInput();
             
                 filter = Builders<BsonDocument>.Filter.Eq(MealEntry.IS_GOOD_PRICE_STR, enteredPrice);
-                results = collection.Find(filter).ToList();
+                Console.WriteLine("Searching for food entries...");
+                results = (await collection.FindAsync(filter)).ToList();
                 break;
             
             case SEARCH_PROPERTY_ID:
@@ -217,7 +229,8 @@ class Program
                 ObjectId documentId = new ObjectId(enteredFoodId);
                 
                 filter = Builders<BsonDocument>.Filter.Eq(MealEntry.ID_STR, documentId);
-                results = collection.Find(filter).ToList();
+                Console.WriteLine("Searching for food entries...");
+                results = (await collection.FindAsync(filter)).ToList();
                 break;
             
             default:
@@ -240,15 +253,39 @@ class Program
             Console.WriteLine("No food entries found");
         }
     }
+
+    private static async Task ListAllFoodEntriesAsync()
+    {
+        FilterDefinition<BsonDocument> filter = Builders<BsonDocument>.Filter.Empty;
+        Console.WriteLine("Searching for food entries...");
+        List<BsonDocument> results = (await collection.FindAsync(filter)).ToList();
+        
+        if (results.Count > 0)
+        {
+            MealEntry entry = null;
+            foreach (var r in results)
+            {
+                entry = BsonSerializer.Deserialize<MealEntry>(r);
+                Console.WriteLine("----------\n" + entry.FormattedString());
+            }
+        
+            Console.WriteLine("----------");
+        }
+        else
+        {
+            Console.WriteLine("No food entries found");
+        }
+    }
     
-    private static void DeleteEntry()
+    private static async Task DeleteEntryAsync()
     {
         Console.WriteLine("Enter the 24 character hexadecimal id of the food entry you would like to delete:");
         string enteredFoodId = Helper.GetValidHexInput();
         ObjectId documentId = new ObjectId(enteredFoodId);
         
         FilterDefinition<BsonDocument> filter = Builders<BsonDocument>.Filter.Eq(MealEntry.ID_STR, documentId);
-        DeleteResult res = collection.DeleteOne(filter);
+        Console.WriteLine("Deleting food entry...");
+        DeleteResult res = await collection.DeleteOneAsync(filter);
         
         if (res.DeletedCount > 0)
         {
@@ -264,14 +301,14 @@ class Program
     /// Loads environment variables into the program
     /// </summary>
     /// <param name="filePath">The path to the environment file</param>
-    private static void LoadEnvironmentFile(string filePath)
+    private static async Task LoadEnvironmentFileAsync(string filePath)
     {
         //Exit if there is no file
         if (!File.Exists(filePath))
             return;
 
         //Load each line in the file
-        foreach (var line in File.ReadAllLines(filePath))
+        foreach (var line in await File.ReadAllLinesAsync(filePath))
         {
             //Split the line between the equals sign
             var parts = line.Split(
@@ -287,7 +324,7 @@ class Program
         }
     }
 
-    private static void InitMongoConnection()
+    private static async Task InitMongoConnectionAsync()
     {
         //Creates a class map for the MealEntry class so it can be treated as a BSON doucment
         BsonClassMap.RegisterClassMap<MealEntry>(classMap =>
@@ -303,7 +340,7 @@ class Program
         //Load and initialize the environment file with the MongoDB credentials
         var root = Directory.GetCurrentDirectory();
         var dotenv = Path.Combine(root, ".env");
-        LoadEnvironmentFile(dotenv);
+        await LoadEnvironmentFileAsync(dotenv);
         var config = new ConfigurationBuilder().AddEnvironmentVariables().Build();
         
         //Create the connection string
@@ -322,7 +359,7 @@ class Program
         // Send a ping to confirm a successful connection
         try 
         {
-            var result = client.GetDatabase("admin").RunCommand<BsonDocument>(new BsonDocument("ping", 1));
+            var result = await client.GetDatabase("admin").RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1));
             Console.WriteLine("Pinged your deployment. You successfully connected to MongoDB!");
         }
         catch (Exception ex) 
